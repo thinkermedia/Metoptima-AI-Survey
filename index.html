@@ -769,10 +769,21 @@ function flattenAnswersForSubmit(){
       labels[q.id] = (answers[q.id]||[]).map(v=>labelForValue(q,v)).join('|');
       values[q.id] = (answers[q.id]||[]).join('|');
       if (otherText[q.id]){ labels[q.id+'_Other']=otherText[q.id]; values[q.id+'_Other']=otherText[q.id]; }
-    } else if (q.type==='gridscale' || q.type==='scale'){
-      labels[q.id+'_Grid'] = answers[q.id]; values[q.id+'_Grid'] = answers[q.id];
+    } else if (q.type==='scale'){
+      labels[q.id] = answers[q.id]; values[q.id] = answers[q.id];
+    } else if (q.type==='gridscale'){
+      const obj = answers[q.id] || {};
+      q.rows.forEach(row=>{
+        const key = q.id+'_'+row.v;
+        labels[key] = obj[row.v]; values[key] = obj[row.v];
+      });
     } else if (q.type==='dualgrid'){
-      labels[q.id+'_Grid'] = answers[q.id]; values[q.id+'_Grid'] = answers[q.id];
+      const obj = answers[q.id] || {};
+      q.rows.forEach(row=>{
+        const r = obj[row.v] || {};
+        labels[q.id+'_'+row.v+'_clarity'] = r.clarity; values[q.id+'_'+row.v+'_clarity'] = r.clarity;
+        labels[q.id+'_'+row.v+'_appeal'] = r.appeal; values[q.id+'_'+row.v+'_appeal'] = r.appeal;
+      });
     } else if (q.type==='rank'){
       labels[q.id+'_Rank'] = answers[q.id].map(v=>labelForValue({options:q.options},v)).join('>');
       values[q.id+'_Rank'] = answers[q.id].join('>');
