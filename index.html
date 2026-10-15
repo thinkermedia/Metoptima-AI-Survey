@@ -158,6 +158,44 @@ const BRANDS = [
 const BRANDS_A1 = [...BRANDS, {v:'none', t:'None of these', exclusive:true}];
 const BRANDS_A4 = [...BRANDS, {v:'none', t:"None – I don't recall any", exclusive:true}];
 
+/* A3 per-row closed supplier lists. Standard trailing options (Handled in-house /
+   None / not applicable / Other (specify)) are appended automatically in
+   optionsForSupplierRow() — do not repeat them in these lists.
+   2026-10-15: all three rows now show the full A1 brand list (same BRANDS
+   entries/codes as A1 itself, not separate row-specific lists), per Aki's
+   decision. The earlier row-specific "pca" list (ABB/Honeywell/Siemens/
+   Emerson/Schneider+AVEVA/Yokogawa/Metso/FLS/Andritz/Mipac/Mintek) is kept
+   below, commented out, in case that approach is revisited. */
+const A3_FULL_LIST = BRANDS.filter(o=>o.v!=='other'); // minus BRANDS' own trailing Other (standard Other col added below)
+const A3_SUPPLIER_LISTS = {
+  pca: A3_FULL_LIST,
+  pm: A3_FULL_LIST,
+  ai: A3_FULL_LIST
+};
+/* Prior row-specific "process control & automation" list (superseded above):
+const A3_PCA_LIST_PRIOR = [
+  {v:'abb', t:'ABB'},
+  {v:'honeywell', t:'Honeywell'},
+  {v:'siemens', t:'Siemens'},
+  {v:'emerson', t:'Emerson'},
+  {v:'schneider_aveva', t:'Schneider Electric / AVEVA'},
+  {v:'yokogawa', t:'Yokogawa'},
+  {v:'metso', t:'Metso'},
+  {v:'fls', t:'FLS'},
+  {v:'andritz', t:'Andritz'},
+  {v:'mipac', t:'Mipac'},
+  {v:'mintek', t:'Mintek'}
+];
+*/
+function optionsForSupplierRow(rowId){
+  return [
+    ...A3_SUPPLIER_LISTS[rowId],
+    {v:'inhouse', t:'Handled in-house'},
+    {v:'na', t:'None / not applicable'},
+    {v:'other', t:'Other (specify)', hasOther:true}
+  ];
+}
+
 const MINE_SITE_ROLES = [
   {v:'gm', t:'Mine General Manager'},{v:'ops', t:'Operations Manager'},{v:'proc', t:'Process Manager'},
   {v:'tsm', t:'Technical Services Manager'},{v:'cm', t:'Chief Metallurgist'},{v:'ms', t:'Metallurgy Superintendent'},
@@ -249,6 +287,14 @@ const QUESTIONS = [
 { id:'A2', section:'Section A', sectionDesc:'The supplier landscape (unbranded)', type:'single',
   text:'And which ONE of these do you most associate with AI-driven optimisation specifically for mineral processing?', sub:'(Select one — shown only for brands selected above)',
   pipeFrom:'A1', skipIf:(a)=> (a.A1||[]).includes('none')
+},
+{ id:'A3', section:'Section A', sectionDesc:'The supplier landscape (unbranded)', type:'gridsupplier',
+  text:'Which suppliers does your site/organisation currently work with in each of the following areas?', sub:'(Select one per row)',
+  rows:[
+    {v:'pca', t:'Process control & automation (incl. APC)'},
+    {v:'pm', t:'Predictive maintenance analytics on equipment'},
+    {v:'ai', t:'AI / advanced analytics or process optimisation software'}
+  ]
 },
 { id:'A4', section:'Section A', sectionDesc:'The supplier landscape (unbranded)', type:'multi',
   text:'In the past 12 months, from which of the following (if any) do you recall seeing marketing or content about AI or analytics for mineral processing?', sub:'(Select all relevant)',
@@ -555,6 +601,24 @@ function render(){
     html += `<div class="rating-block"><div class="rating-block-label">Clarity</div>` + scaleRow(q.id+'_c', q.scaleLabelsA, (ans[row.v]||{}).clarity, `(v)=>{selectDual('${q.id}','${row.v}','clarity',v);}`) + `</div>`;
     html += `<div class="rating-block"><div class="rating-block-label">Appeal</div>` + scaleRow(q.id+'_a', q.scaleLabelsB, (ans[row.v]||{}).appeal, `(v)=>{selectDual('${q.id}','${row.v}','appeal',v);}`) + `</div>`;
   }
+  else if (q.type==='gridsupplier'){
+    const row = q.rows[gridSubIndex];
+    const rowKey = q.id+'_'+row.v;
+    const rowOpts = optionsForSupplierRow(row.v);
+    const ans = answers[q.id] || {};
+    const selected = ans[row.v];
+    html += `<div class="attr-progress">Area ${gridSubIndex+1} of ${q.rows.length}</div>`;
+    html += `<div class="grid-row-label" style="font-size:17px;">${escapeHtml(row.t)}</div>`;
+    html += `<div class="options">`;
+    rowOpts.forEach(o=>{
+      const isSel = selected===o.v;
+      html += `<div class="opt radio ${isSel?'selected':''}" onclick="selectGridSupplier('${q.id}','${row.v}','${o.v}')">
+        <div class="marker"></div>
+        <div style="flex:1;">${escapeHtml(o.t)}${o.hasOther && isSel ? `<div><input type="text" class="other-input" placeholder="Please specify" value="${escapeHtml(otherText[rowKey]||'')}" onclick="event.stopPropagation()" oninput="otherText['${rowKey}']=this.value"/></div>`:''}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
   else if (q.type==='rank'){
     if(!answers[q.id]) answers[q.id] = q.options.map(o=>o.v);
     const order = answers[q.id];
@@ -595,6 +659,7 @@ function selectOption(qid, val){
 }
 window.selectGridScale = function(qid,row,v){ if(!answers[qid]) answers[qid]={}; answers[qid][row]=v; render(); };
 window.selectDual = function(qid,row,dim,v){ if(!answers[qid]) answers[qid]={}; if(!answers[qid][row]) answers[qid][row]={}; answers[qid][row][dim]=v; render(); };
+window.selectGridSupplier = function(qid,row,v){ if(!answers[qid]) answers[qid]={}; answers[qid][row]=v; render(); };
 window.rankMove = function(qid,i,dir){ const arr=answers[qid]; const j=i+dir; if(j<0||j>=arr.length) return; [arr[i],arr[j]]=[arr[j],arr[i]]; render(); };
 
 /* ---- Drag-and-drop reordering for 'rank' questions (mouse + touch via Pointer Events) ---- */
@@ -670,6 +735,14 @@ function currentAnswerValid(q){
     const row = q.rows[gridSubIndex]; const ans = (answers[q.id]||{})[row.v]||{};
     return ans.clarity!==undefined && ans.appeal!==undefined;
   }
+  if (q.type==='gridsupplier'){
+    const row = q.rows[gridSubIndex]; const ans = answers[q.id]||{};
+    const val = ans[row.v];
+    if (val===undefined) return false;
+    const opt = optionsForSupplierRow(row.v).find(o=>o.v===val);
+    if (opt && opt.hasOther && !(otherText[q.id+'_'+row.v]||'').trim()) return false;
+    return true;
+  }
   if (q.type==='rank') return true;
   return true;
 }
@@ -736,7 +809,7 @@ async function goNext(){
     if (quotaReason){ terminate(quotaReason); return; }
   }
 
-  if ((q.type==='gridscale' || q.type==='dualgrid') && gridSubIndex < q.rows.length-1){
+  if ((q.type==='gridscale' || q.type==='dualgrid' || q.type==='gridsupplier') && gridSubIndex < q.rows.length-1){
     gridSubIndex++; render(); return;
   }
   gridSubIndex = 0;
@@ -754,7 +827,7 @@ async function goNext(){
 }
 function goBack(){
   const q = QUESTIONS[current];
-  if ((q.type==='gridscale' || q.type==='dualgrid') && gridSubIndex > 0){ gridSubIndex--; render(); return; }
+  if ((q.type==='gridscale' || q.type==='dualgrid' || q.type==='gridsupplier') && gridSubIndex > 0){ gridSubIndex--; render(); return; }
   let prev = current-1;
   while(prev>0){
     const pq = QUESTIONS[prev];
@@ -762,7 +835,7 @@ function goBack(){
     break;
   }
   current = prev;
-  if (QUESTIONS[current].type==='gridscale' || QUESTIONS[current].type==='dualgrid'){
+  if (QUESTIONS[current].type==='gridscale' || QUESTIONS[current].type==='dualgrid' || QUESTIONS[current].type==='gridsupplier'){
     gridSubIndex = QUESTIONS[current].rows.length-1;
   }
   render();
@@ -790,6 +863,16 @@ function flattenAnswersForSubmit(){
         const r = obj[row.v] || {};
         labels[q.id+'_'+row.v+'_clarity'] = r.clarity; values[q.id+'_'+row.v+'_clarity'] = r.clarity;
         labels[q.id+'_'+row.v+'_appeal'] = r.appeal; values[q.id+'_'+row.v+'_appeal'] = r.appeal;
+      });
+    } else if (q.type==='gridsupplier'){
+      const obj = answers[q.id] || {};
+      q.rows.forEach(row=>{
+        const key = q.id+'_'+row.v;
+        const val = obj[row.v];
+        const opt = optionsForSupplierRow(row.v).find(o=>o.v===val);
+        labels[key] = opt ? opt.t : val;
+        values[key] = val;
+        if (otherText[key]){ labels[key+'_Other']=otherText[key]; values[key+'_Other']=otherText[key]; }
       });
     } else if (q.type==='rank'){
       labels[q.id+'_Rank'] = answers[q.id].map(v=>labelForValue({options:q.options},v)).join('>');
